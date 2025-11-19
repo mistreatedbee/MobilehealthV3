@@ -2,20 +2,38 @@ import { User, Patient, Doctor, Appointment, Prescription, DoctorStatus, Appoint
 import { API_URL } from '../utils/apiConfig';
 
 async function request(endpoint: string, method = "GET", body?: any) {
+  // Detect iOS Safari
+  const isIOSSafari = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+  
   const options: RequestInit = {
     method,
     headers: {
       "Content-Type": "application/json",
     },
-    credentials: "include",
+    // iOS Safari has issues with credentials: "include" for cross-origin
+    // Try with credentials first, but it might not work on iOS Safari
+    credentials: isIOSSafari ? "same-origin" : "include",
+    mode: "cors",
   };
 
   if (body) options.body = JSON.stringify(body);
 
-  console.log("🌐 API Request:", method, `${API_URL}${endpoint}`);
+  console.log("🌐 API Request:", method, `${API_URL}${endpoint}`, {
+    platform: navigator.userAgent,
+    isIOSSafari,
+    credentials: options.credentials
+  });
 
   try {
     const res = await fetch(`${API_URL}${endpoint}`, options);
+
+    // Log response details for debugging
+    console.log("📡 API Response:", {
+      status: res.status,
+      statusText: res.statusText,
+      headers: Object.fromEntries(res.headers.entries()),
+      url: res.url
+    });
 
     if (!res.ok) {
       const errorText = await res.text();
@@ -29,6 +47,14 @@ async function request(endpoint: string, method = "GET", body?: any) {
       }
       
       console.error("❌ API Error:", res.status, errorMessage);
+      
+      // Special handling for iOS Safari CORS issues
+      if (res.status === 0 || errorMessage.includes("Failed to fetch") || errorMessage.includes("NetworkError")) {
+        if (isIOSSafari) {
+          throw new Error("Network error. Please check your internet connection and try again. If the problem persists, try using a different browser.");
+        }
+      }
+      
       throw new Error(errorMessage || `Request failed: ${res.status}`);
     }
 
@@ -36,7 +62,18 @@ async function request(endpoint: string, method = "GET", body?: any) {
     console.log("✅ API Response:", endpoint, "success");
     return data;
   } catch (error: any) {
-    console.error("❌ API Request failed:", endpoint, error.message);
+    console.error("❌ API Request failed:", endpoint, {
+      message: error.message,
+      stack: error.stack,
+      isIOSSafari,
+      apiUrl: API_URL
+    });
+    
+    // Provide more helpful error messages for iOS
+    if (isIOSSafari && (error.message.includes("Failed to fetch") || error.message.includes("NetworkError"))) {
+      throw new Error("Unable to connect to server. Please check your internet connection. If using Safari, try enabling 'Prevent Cross-Site Tracking' in Settings → Safari.");
+    }
+    
     throw error;
   }
 }

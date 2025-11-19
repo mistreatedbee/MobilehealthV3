@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">mobile-health-app</string>
+    <string name="title_activity_main">mobile-health-app</string>
+    <string name="package_name">com.mobilehealth</string>
+    <string name="custom_url_scheme">com.mobilehealth</string>
+</resources>
